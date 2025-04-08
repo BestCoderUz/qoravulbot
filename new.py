@@ -8,6 +8,7 @@ import time
 api_id = 29766810           # example: 12345678 (integer, no quotes)
 api_hash = '1e4e06c4693b0682c0fc90cc96675f20'      # example: 'abcd1234efgh5678ijkl9012mnop3456'
 bot_token = '1817596018:AAEvhSM8EYI-mOBqwTZVC8bDaCoU9yFwhIk'
+
 bot = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
 
 # Link va username regex
@@ -27,7 +28,7 @@ bad_words = [
 # 10 minutga ban qilish funksiyasi
 async def mute_user(event, user_id):
     rights = ChatBannedRights(
-        until_date=int(time.time()) + 600,  # 10 minut = 600 sekund
+        until_date=int(time.time()) + 600,  # 10 minut
         send_messages=True
     )
     try:
@@ -45,27 +46,33 @@ async def handler(event):
     if event.is_group:
         message_text = event.raw_text.lower()
 
-        # 1. Link yoki haqorat bormi tekshirish
-        if link_pattern.search(message_text) or any(bad_word in message_text for bad_word in bad_words):
+        # Agar link (reklama) bo'lsa
+        if link_pattern.search(message_text):
+            try:
+                await event.delete()
+                await event.respond("⚠️ Reklama tarqatish taqiqlangan!")
+            except Exception as e:
+                print(f"Error deleting ad: {e}")
+
+        # Agar haqorat (so'kinish) bo'lsa
+        elif any(bad_word in message_text for bad_word in bad_words):
             try:
                 await event.delete()
                 await mute_user(event, event.sender_id)
+                await event.respond(f"⚠️ Sökinish taqiqlangan!\n{(await event.get_sender()).first_name} 10 minutga cheklab qo‘yildi.")
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"Error muting user: {e}")
 
-        # 2. Agar admin /ban komandasini yozsa
+        # Agar admin /ban jo'natsa
         if event.raw_text.lower() == '/ban' and event.is_reply:
             try:
                 reply_msg = await event.get_reply_message()
                 reply_text = reply_msg.raw_text.lower()
 
-                # Reply qilingan matnni haqoratlar ro'yxatiga qo'shamiz
                 bad_words.append(reply_text.strip())
-
-                # Reply bergan foydalanuvchini 10 minutga cheklaymiz
                 await mute_user(event, reply_msg.sender_id)
 
-                await event.respond("So'z ro'yxatga qo'shildi va foydalanuvchi 10 minutga cheklangan.")
+                await event.respond("⚠️ So'z ro'yxatga qo'shildi va foydalanuvchi 10 minutga cheklab qo‘yildi.")
             except Exception as e:
                 print(f"Error in /ban: {e}")
 
